@@ -1,3 +1,12 @@
+# Edits done from original module
+Get updated version from https://github.com/HoloArchivists/youtube-community-tab
+Add publishtexttime of original post. See function def from_data(post_data): in post.py
+
+To install this version of youtube_community_tab, download all files then type :
+```bash
+pip3 install .
+```
+
 # youtube_community_tab
 
 Python3 interface to YouTube community tab, it handles posts, comments and comment replies.
