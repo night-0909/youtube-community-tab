@@ -4,7 +4,6 @@ from hashlib import sha1
 
 CLIENT_VERSION = "2.20220311.01.00"
 
-
 def safely_get_value_from_key(*args, default=None):
     obj = args[0]
     keys = args[1:]

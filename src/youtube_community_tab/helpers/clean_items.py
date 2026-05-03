@@ -37,7 +37,7 @@ def clean_backstage_attachment(attachment):
                     "voteRatioIfSelected",
                     "votePercentageIfSelected",
                     "voteRatioIfNotSelected",
-                    "votePercentageIfNotSelected",
+                    "votePercentageIfNotSelected"
                 ]:
                     safe_pop(choice, value)
         elif "videoRenderer" in attachment:
@@ -48,15 +48,18 @@ def clean_backstage_attachment(attachment):
             )
 
             for long_by_line in safe(attachment, "videoRenderer", "longBylineText", "runs", default=[]):
-                long_by_line["browseEndpoint"] = long_by_line["navigationEndpoint"]["browseEndpoint"]
-                long_by_line.pop("navigationEndpoint")
+                if "browseEndpoint" in long_by_line["navigationEndpoint"]:
+                    long_by_line["browseEndpoint"] = long_by_line["navigationEndpoint"]["browseEndpoint"]
+                    long_by_line.pop("navigationEndpoint")
 
             for short_by_line in safe(attachment, "videoRenderer", "shortBylineText", "runs", default=[]):
-                short_by_line["browseEndpoint"] = short_by_line["navigationEndpoint"]["browseEndpoint"]
-                short_by_line.pop("navigationEndpoint")
+                if "browseEndpoint" in short_by_line["navigationEndpoint"]:
+                    short_by_line["browseEndpoint"] = short_by_line["navigationEndpoint"]["browseEndpoint"]
+                    short_by_line.pop("navigationEndpoint")
 
             for author in safe(attachment, "videoRenderer", "ownerText", "runs", default=[]):
-                author["browseEndpoint"] = author["navigationEndpoint"]["browseEndpoint"]
+                if "browseEndpoint" in author["navigationEndpoint"]:
+                    author["browseEndpoint"] = author["navigationEndpoint"]["browseEndpoint"]
 
             for value in [
                 "publishedTimeText",
@@ -65,7 +68,7 @@ def clean_backstage_attachment(attachment):
                 "showActionMenu",
                 "menu",
                 "channelThumbnailSupportedRenderers",
-                "thumbnailOverlays",
+                "thumbnailOverlays"
             ]:
                 safe_pop(attachment, "videoRenderer", value)
         elif "backstageImageRenderer" in attachment:
