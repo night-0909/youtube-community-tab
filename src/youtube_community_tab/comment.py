@@ -28,7 +28,7 @@ class Comment(object):
         replies_continuation_token=None,
         click_tracking_params=None,
         visitor_data=None,
-        session_index="0",
+        session_index="0"
     ):
         self.post_id = post_id
         self.comment_id = comment_id
@@ -49,7 +49,7 @@ class Comment(object):
             "channel_id": self.channel_id,
             "author": self.author,
             "content_text": self.content_text,
-            "vote_count": self.vote_count,
+            "vote_count": self.vote_count
         }
 
     def __str__(self):
@@ -65,8 +65,9 @@ class Comment(object):
 
     def load_replies(self, expire_after=0):
         headers = {
+            "Accept-Language": "en-US,en;q=0.9",
             "x-origin": "https://www.youtube.com",
-            "Referer": Comment.FORMAT_URLS["POST"].format(self.post_id),
+            "Referer": Comment.FORMAT_URLS["POST"].format(self.post_id)
         }
 
         # Add authorization header
@@ -80,7 +81,7 @@ class Comment(object):
                     "X-Goog-AuthUser": self.session_index,
                     "X-Origin": "https://www.youtube.com",
                     "X-Youtube-Client-Name": "1",
-                    "X-Youtube-Client-Version": CLIENT_VERSION,
+                    "X-Youtube-Client-Version": CLIENT_VERSION
                 }
             )
 
@@ -90,17 +91,17 @@ class Comment(object):
                         "clientName": "WEB",
                         "clientVersion": CLIENT_VERSION,
                         "originalUrl": Comment.FORMAT_URLS["POST"].format(self.post_id),
-                        "visitorData": self.visitor_data,
+                        "visitorData": self.visitor_data
                     }
                 },
                 "continuation": self.replies_continuation_token,
-                "clickTracking": {"clickTrackingParams": self.click_tracking_params},
+                "clickTracking": {"clickTrackingParams": self.click_tracking_params}
             }
 
             r = requests_cache.post(Comment.FORMAT_URLS["BROWSE_ENDPOINT"], json=json_body, expire_after=expire_after, headers=headers)
 
             data = r.json()
-            append = safely_get_value_from_key(data, "onResponseReceivedEndpoints", 0, "appendContinuationItemsAction", default=[])
+            append = data["onResponseReceivedEndpoints"][0]["appendContinuationItemsAction"]
             self.click_tracking_params = data["trackingParams"]
             continuation_items = safely_get_value_from_key(append, "continuationItems", default=[])
 
@@ -142,7 +143,7 @@ class Comment(object):
             replies_continuation_token=replies_continuation_token,
             click_tracking_params=click_tracking_params,
             visitor_data=visitor_data,
-            session_index=session_index,
+            session_index=session_index
         )
 
         comment.raw_data = data
@@ -173,7 +174,7 @@ class Comment(object):
             b"\xF2\x01",
             len(channel_id).to_bytes(1, "big"),
             channel_id.encode(),
-            b"B\x10comments-section",
+            b"B\x10comments-section"
         ]
 
         part1 = urlsafe_b64encode(b"".join(part1)).replace(b"=", b"%3D")
@@ -187,7 +188,7 @@ class Comment(object):
             b"\x1A",
             (54 + 3 * len(post_id)).to_bytes(1, "big"),
             b"\x02",
-            part1,
+            part1
         ]
 
         params = urlsafe_b64encode(b"".join(params)).decode().replace("=", "%3D")
@@ -198,8 +199,9 @@ class Comment(object):
     def from_ids(comment_id, post_id, channel_id, expire_after=0):
         fixed_comment_url = Comment.FORMAT_URLS["FIXED_COMMENT"].format(channel_id, comment_id, post_id)
         headers = {
+            "Accept-Language": "en-US,en;q=0.9",
             "x-origin": "https://www.youtube.com",
-            "Referer": fixed_comment_url,
+            "Referer": fixed_comment_url
         }
 
         # Add authorization header
@@ -217,7 +219,7 @@ class Comment(object):
                     "originalUrl": fixed_comment_url,
                 }
             },
-            "continuation": c,
+            "continuation": c
         }
 
         r = requests_cache.post(Comment.FORMAT_URLS["BROWSE_ENDPOINT"], json=json_body, expire_after=expire_after, headers=headers)
@@ -240,7 +242,7 @@ class Comment(object):
                     "continuationItemRenderer",
                     "continuationEndpoint",
                     "continuationCommand",
-                    "token",
+                    "token"
                 ),
                 safely_get_value_from_key(
                     comment_data,
@@ -250,10 +252,10 @@ class Comment(object):
                     0,
                     "continuationItemRenderer",
                     "continuationEndpoint",
-                    "clickTrackingParams",
+                    "clickTrackingParams"
                 ),
                 None,
-                None,
+                None
             )
 
     @staticmethod
@@ -267,7 +269,7 @@ class Comment(object):
             post_id.encode(),
             b"Z",
             len(channel_id).to_bytes(1, "big"),
-            channel_id.encode(),
+            channel_id.encode()
         ]
 
         params = urlsafe_b64encode(b"".join(params)).decode().replace("=", "%3D")
@@ -283,7 +285,8 @@ class Comment(object):
             update_comment_params = Comment.get_update_comment_params(comment_id, post_id, channel_id)
 
         headers = {
-            "x-origin": "https://www.youtube.com",
+            "Accept-Language": "en-US,en;q=0.9",
+            "x-origin": "https://www.youtube.com"
         }
 
         current_cookies = dict_from_cookiejar(requests_cache.cookies)
@@ -294,17 +297,17 @@ class Comment(object):
             "context": {
                 "client": {
                     "clientName": "WEB",
-                    "clientVersion": CLIENT_VERSION,
-                },
+                    "clientVersion": CLIENT_VERSION
+                }
             },
             "updateCommentParams": update_comment_params,
-            "commentText": comment_text,
+            "commentText": comment_text
         }
 
         r = requests_cache.post(
             Comment.FORMAT_URLS["UPDATE_COMMENT_ENDPOINT"],
             json=json_body,
-            headers=headers,
+            headers=headers
         )
 
         return r.json()
@@ -321,7 +324,7 @@ class Comment(object):
             b"\xBA\x01",
             len(channel_id).to_bytes(1, "big"),
             channel_id.encode(),
-            b"\xF0\x01\x01",
+            b"\xF0\x01\x01"
         ]
 
         params = urlsafe_b64encode(b"".join(params)).decode().replace("=", "%3D")
@@ -352,7 +355,7 @@ class Comment(object):
             b"\xBA\x01",
             len(channel_id).to_bytes(1, "big"),
             channel_id.encode(),
-            b"\xF0\x01\x01",
+            b"\xF0\x01\x01"
         ]
 
         params = urlsafe_b64encode(b"".join(params)).decode().replace("=", "%3D")
@@ -383,7 +386,7 @@ class Comment(object):
             b"\xBA\x01",
             len(channel_id).to_bytes(1, "big"),
             channel_id.encode(),
-            b"\xF0\x01\x01",
+            b"\xF0\x01\x01"
         ]
 
         params = urlsafe_b64encode(b"".join(params)).decode().replace("=", "%3D")
@@ -403,7 +406,8 @@ class Comment(object):
     @staticmethod
     def perform_action(action_params):
         headers = {
-            "x-origin": "https://www.youtube.com",
+            "Accept-Language": "en-US,en;q=0.9",
+            "x-origin": "https://www.youtube.com"
         }
 
         current_cookies = dict_from_cookiejar(requests_cache.cookies)
@@ -418,14 +422,14 @@ class Comment(object):
                 },
             },
             "actions": [
-                action_params,
-            ],
+                action_params
+            ]
         }
 
         r = requests_cache.post(
             Comment.FORMAT_URLS["PERFORM_COMMENT_ACTION_ENDPOINT"],
             json=json_body,
-            headers=headers,
+            headers=headers
         )
 
         return r.json()

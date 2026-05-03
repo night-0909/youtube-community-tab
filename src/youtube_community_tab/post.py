@@ -1,10 +1,10 @@
-import json
+import json, sys
 import re
 from requests.utils import dict_from_cookiejar
 from base64 import urlsafe_b64encode
 
 from .helpers.clean_items import clean_content_text, clean_backstage_attachment
-from .helpers.utils import safely_get_value_from_key, get_auth_header, CLIENT_VERSION, search_key
+from .helpers.utils import safely_get_value_from_key, search_key, get_auth_header, CLIENT_VERSION
 from .requests_handler import requests_cache
 from .comment import Comment
 
@@ -14,14 +14,14 @@ class Post(object):
         "POST": "https://www.youtube.com/post/{}",
         # HARD_CODED: This key seems to be constant to everyone, IDK
         "BROWSE_ENDPOINT": "https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
-        "CREATE_COMMENT_ENDPOINT": "https://www.youtube.com/youtubei/v1/comment/create_comment?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false",
+        "CREATE_COMMENT_ENDPOINT": "https://www.youtube.com/youtubei/v1/comment/create_comment?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false"
     }
 
     REGEX = {
-        "YT_INITIAL_DATA": "ytInitialData = ({(?:(?:.|\n)*)?});</script>",
+        "YT_INITIAL_DATA": "ytInitialData = ({(?:(?:.|\n)*)?});</script>"
     }
 
-    def __init__(self, post_id, channel_id=None, author=None, content_text=None, backstage_attachment=None, vote_count=None, sponsor_only_badge=None, published_time_text=None, original_post=None):
+    def __init__(self, post_id, channel_id, author=None, content_text=None, backstage_attachment=None, vote_count=None, sponsor_only_badge=None, published_time_text=None, original_post=None):
         self.post_id = post_id
         self.channel_id = channel_id
         self.author = author
@@ -48,12 +48,18 @@ class Post(object):
             "backstage_attachment": self.backstage_attachment,
             "vote_count": self.vote_count,
             "sponsor_only_badge": self.sponsor_only_badge,
-            "original_post": self.original_post,
+            "original_post": self.original_post and self.original_post.as_json()
         }
+
+    def get_published_string(self):
+        return self.published_time_text
 
     @staticmethod
     def from_post_id(post_id, expire_after=0):
-        headers = {"Referer": Post.FORMAT_URLS["POST"].format(post_id)}
+        headers = {
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": Post.FORMAT_URLS["POST"].format(post_id)
+        }
 
         # Add authorization header
         current_cookies = dict_from_cookiejar(requests_cache.cookies)
@@ -65,7 +71,6 @@ class Post(object):
 
         m = re.findall(Post.REGEX["YT_INITIAL_DATA"], r.text)
         data = json.loads(m[0])
-
         community_tab = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]
         community_tab_items = Post.get_items_from_community_tab(community_tab)
 
@@ -111,8 +116,11 @@ class Post(object):
 
     def get_first_continuation_token(self, data):
         self.comments_continuation_token = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"][
-            "contents"
-        ][1]["itemSectionRenderer"]["contents"][0]["continuationItemRenderer"]["continuationEndpoint"]["continuationCommand"]["token"]
+            "contents"][1]["itemSectionRenderer"]["contents"][0]["continuationItemRenderer"]["continuationEndpoint"]["continuationCommand"]["token"]
+
+    def get_click_tracking_params(self, data):
+        self.click_tracking_params = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"][
+            "contents"][1]["itemSectionRenderer"]["contents"][0]["continuationItemRenderer"]["continuationEndpoint"]["clickTrackingParams"]
 
     def get_click_tracking_params(self, data):
         self.click_tracking_params = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][
@@ -120,7 +128,10 @@ class Post(object):
         ]["itemSectionRenderer"]["contents"][0]["continuationItemRenderer"]["continuationEndpoint"]["clickTrackingParams"]
 
     def load_comments(self, expire_after=0):
-        headers = {"Referer": Post.FORMAT_URLS["POST"].format(self.post_id)}
+        headers = {
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": Post.FORMAT_URLS["POST"].format(self.post_id)
+        }
 
         # Add authorization header
         current_cookies = dict_from_cookiejar(requests_cache.cookies)
@@ -137,7 +148,7 @@ class Post(object):
                 self.get_first_continuation_token(data)
                 self.get_click_tracking_params(data)
                 self.visitor_data = data["responseContext"]["webResponseContextExtensionData"]["ytConfigData"]["visitorData"]
-                self.session_index = str(safely_get_value_from_key(data, "responseContext", "webResponseContextExtensionData", "ytConfigData", "sessionIndex"))
+                self.session_index = str(data["responseContext"]["webResponseContextExtensionData"]["ytConfigData"]["sessionIndex"])
                 self.load_comments(expire_after=expire_after)
             except Exception as e:
                 print("[Some non-expected exception, probably caused by requests...]")
@@ -148,7 +159,7 @@ class Post(object):
                     "X-Goog-AuthUser": self.session_index,
                     "X-Origin": "https://www.youtube.com",
                     "X-Youtube-Client-Name": "1",
-                    "X-Youtube-Client-Version": CLIENT_VERSION,
+                    "X-Youtube-Client-Version": CLIENT_VERSION
                 }
             )
 
@@ -158,11 +169,11 @@ class Post(object):
                         "clientName": "WEB",
                         "clientVersion": CLIENT_VERSION,
                         "originalUrl": Post.FORMAT_URLS["POST"].format(self.post_id),
-                        "visitorData": self.visitor_data,
+                        "visitorData": self.visitor_data
                     }
                 },
                 "continuation": self.comments_continuation_token,
-                "clickTracking": {"clickTrackingParams": self.click_tracking_params},
+                "clickTracking": {"clickTrackingParams": self.click_tracking_params}
             }
 
             r = requests_cache.post(Post.FORMAT_URLS["BROWSE_ENDPOINT"], json=json_body, expire_after=expire_after, headers=headers)
@@ -203,7 +214,7 @@ class Post(object):
                             "continuationItemRenderer",
                             "continuationEndpoint",
                             "continuationCommand",
-                            "token",
+                            "token"
                         ),
                         safely_get_value_from_key(
                             item[kind],
@@ -213,10 +224,10 @@ class Post(object):
                             0,
                             "continuationItemRenderer",
                             "continuationEndpoint",
-                            "clickTrackingParams",
+                            "clickTrackingParams"
                         ),
                         self.visitor_data,
-                        self.session_index,
+                        self.session_index
                     )
                 )
             elif kind == "continuationItemRenderer":
@@ -232,9 +243,6 @@ class Post(object):
         if self.content_text is not None:
             return "\n".join([run["text"] for run in runs])
         return None
-
-    def get_published_string(self):
-        return self.published_time_text
 
     def get_create_comment_params(self):
         if self.channel_id is None or self.post_id is None:
@@ -255,7 +263,8 @@ class Post(object):
 
     def create_comment(self, comment_text):
         headers = {
-            "x-origin": "https://www.youtube.com",
+            "Accept-Language": "en-US,en;q=0.9",
+            "x-origin": "https://www.youtube.com"
         }
 
         current_cookies = dict_from_cookiejar(requests_cache.cookies)
@@ -270,13 +279,13 @@ class Post(object):
                 },
             },
             "createCommentParams": self.get_create_comment_params(),
-            "commentText": comment_text,
+            "commentText": comment_text
         }
 
         r = requests_cache.post(
             Post.FORMAT_URLS["CREATE_COMMENT_ENDPOINT"],
             json=json_body,
-            headers=headers,
+            headers=headers
         )
 
         try:
@@ -295,8 +304,11 @@ class Post(object):
             data["authorText"] = data.pop("displayName")
             data["authorEndpoint"] = data.pop("endpoint")
 
-            original_post_data = post_data["sharedPostRenderer"]["originalPost"]
-            data["originalPost"] = Post.from_data(original_post_data)
+            if "originalPost" in post_data["sharedPostRenderer"]:
+                original_post_data = post_data["sharedPostRenderer"]["originalPost"]
+                # Add publishtexttime of original post
+                original_post_data['published_time_text']=safely_get_value_from_key(original_post_data, "backstagePostRenderer", "publishedTimeText", "runs", 0, "text", default=None)
+                data["originalPost"] = Post.from_data(original_post_data)
 
         elif "backstagePostRenderer" in post_data:
             data = post_data["backstagePostRenderer"]
@@ -304,6 +316,7 @@ class Post(object):
             raise NotImplementedError(f"[post_kind={list(post_data.keys())[0]} is not implemented yet!]")
 
         data["channelId"] = data["authorEndpoint"]["browseEndpoint"]["browseId"]
+
         # clean the author cause it's different here for some reason
         for item in data["authorText"]["runs"]:
             item["browseEndpoint"] = item["navigationEndpoint"]["browseEndpoint"]
@@ -321,14 +334,14 @@ class Post(object):
             author={
                 "authorText": safely_get_value_from_key(data, "authorText"),
                 "authorThumbnail": safely_get_value_from_key(data, "authorThumbnail"),
-                "authorEndpoint": safely_get_value_from_key(data, "authorEndpoint"),
+                "authorEndpoint": safely_get_value_from_key(data, "authorEndpoint")
             },
             content_text=clean_content_text(safely_get_value_from_key(data, "contentText")),
             backstage_attachment=clean_backstage_attachment(safely_get_value_from_key(data, "backstageAttachment", default=None)),
             vote_count=safely_get_value_from_key(data, "voteCount"),
             sponsor_only_badge=safely_get_value_from_key(data, "sponsorsOnlyBadge", default=None),
             published_time_text=safely_get_value_from_key(data, "publishedTimeText", "runs", 0, "text", default=None),
-            original_post=safely_get_value_from_key(data, "originalPost", default=None),
+            original_post=safely_get_value_from_key(data, "originalPost", default=None)
         )
 
         post.raw_data = data
