@@ -1,6 +1,6 @@
 # Edits done from original module
-Get updated version from https://github.com/HoloArchivists/youtube-community-tab
-Add publishtexttime of original post. See function def from_data(post_data): in post.py
+Get updated version from https://github.com/HoloArchivists/youtube-community-tab<br/>
+Added publishtexttime of original post. See function def from_data(post_data): in post.py
 
 To install this version of youtube_community_tab, download all files then type :
 ```bash
